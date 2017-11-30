@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import TruncatedSVD
 from scipy.stats import ttest_ind
+from numpy.linalg import svd
 from qvalues import qvalues
 METHYLATION_FILE = './data/GSE76399_data_with_probe_ann.txt'
 PATIENT_FILE = './data/samples_clinical_data.txt'
@@ -68,6 +69,13 @@ def ttestDataframe(dataframe, insulin_geo_dict):
     dataframe = dataframe.join(ttestframe)
     return dataframe
 
+def denoiseMatrixWithSVD(matrix):
+    u,s,v = svd(matrix)
+    u1 = u[:,0].reshape(-1,1)
+    v1 = v[0,:].reshape(1,-1)
+    rank1matrix = u1 @ v1 * s[0]
+    return rank1matrix
+
 
 def main():
     # Reading data from file
@@ -83,7 +91,7 @@ def main():
 
     for gene in gene_set:
         matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
-        #SVD here
+        matrix = denoiseMatrixWithSVD(matrix)
         df = rebuildDataFrame(matrix,SAT_geo_accession,probes)
         df = ttestDataframe(df,insulin_geo_dict)
         gene_result_df = df[['probe_name','p_value']]
@@ -95,6 +103,9 @@ def main():
     qtuple = qvalues(ptuples)
     new_results_df = pd.DataFrame([(q,p,ident[0],ident[1]) for q,p,ident in qtuple], columns=['q_value','p_value','UCSC_RefGene_Accession','probe_name'])
 
+    #Displaying the results
+    #Consider having other options for saving them
+    print(new_results_df)
 
 
 
