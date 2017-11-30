@@ -4,8 +4,9 @@ from sklearn.decomposition import TruncatedSVD
 from scipy.stats import ttest_ind
 from numpy.linalg import svd
 from qvalues import qvalues
-METHYLATION_FILE = './data/GSE76399_data_with_probe_ann.txt'
-PATIENT_FILE = './data/samples_clinical_data.txt'
+METHYLATION_FILE = '../../data/GSE76399_data_with_probe_ann.txt'
+METHYLATION_FILE = '../../data/test_data.txt'
+PATIENT_FILE = '../../data/samples_clinical_data.txt'
 
 def csvToDataFrame(filename):
     '''Reads tab-separated data from filename and returns a dataframe'''
@@ -32,7 +33,7 @@ def cleanData(methylation_data,patient_data):
 def buildGeneSet(clean_methylation_data):
     '''Takes clean methylation data, with gene accessions stored in sets, and returns the set of all genes.'''
     gene_set = set()
-    for i in gene_SAT_methylation_data['UCSC_RefGene_Accession']:
+    for i in clean_methylation_data['UCSC_RefGene_Accession']:
         gene_set |= i # Union of gene_set and i
     return gene_set
 
@@ -44,14 +45,14 @@ def buildMatrix(clean_methylation_data, SAT_geo_accessions, gene_accession):
     df = clean_methylation_data[rows]
     probes = df['Name']
     # Picking columns
-    df = df[SAT_geo_accession]
+    df = df[SAT_geo_accessions]
     # Converts to numpy
     df = df.values
     return df, probes
 
 def rebuildDataFrame(matrix, SAT_geo_accessions,probes):
     '''Rebuilds a dataframe from a matrix.'''
-    df = pd.DataFrame(matrix,colums=SAT_geo_accessions)
+    df = pd.DataFrame(matrix,columns=SAT_geo_accessions)
     probedf = pd.DataFrame(probes,columns=['probe_name'])
     df=df.join(probedf)
     return df
@@ -59,7 +60,7 @@ def rebuildDataFrame(matrix, SAT_geo_accessions,probes):
 def ttestDataframe(dataframe, insulin_geo_dict):
     '''Performs a t-test on the probes in the dataframe. Returns a dataframe with p-values joined on.'''
     # Splits dataframe by group
-    group_dict = {x:dataframe[insuling_geo_dict[x]] for x in ['resistant','sensitive']}
+    group_dict = {x:dataframe[insulin_geo_dict[x]] for x in ['resistant','sensitive']}
 
     # Runs ttest
     test_res = ttest_ind(group_dict['resistant'].values,group_dict['sensitive'],axis=1)
@@ -96,10 +97,10 @@ def main():
         df = ttestDataframe(df,insulin_geo_dict)
         gene_result_df = df[['probe_name','p_value']]
         gene_result_df['UCSC_RefGene_Accession']=gene
-        results_df.append(gene_results_df)
+        results_df.append(gene_result_df)
 
     # Formatting as list of tuples to pass to qvalues function
-    ptuples = [(x[0],(x[1],x[2]) for x in results_df[['p_values','UCSC_RefGene_Accession','probe_name']].values]
+    ptuples = [(x[0],(x[1],x[2])) for x in results_df[['p_value','UCSC_RefGene_Accession','probe_name']].values]
     qtuple = qvalues(ptuples)
     new_results_df = pd.DataFrame([(q,p,ident[0],ident[1]) for q,p,ident in qtuple], columns=['q_value','p_value','UCSC_RefGene_Accession','probe_name'])
 
@@ -109,6 +110,8 @@ def main():
 
 
 
+if __name__=='__main__':
+    main()
 
 
 

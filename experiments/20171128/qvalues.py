@@ -1,3 +1,5 @@
+import numpy as np
+
 def bootstrap(invec):
     idx = npr.randint(0, len(invec), len(invec))
     return [invec[i] for i in idx]
