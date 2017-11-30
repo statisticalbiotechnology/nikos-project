@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import TruncatedSVD
 from scipy.stats import ttest_ind
+from qvalues import qvalues
 METHYLATION_FILE = './data/GSE76399_data_with_probe_ann.txt'
 PATIENT_FILE = './data/samples_clinical_data.txt'
 
@@ -78,7 +79,7 @@ def main():
     insulin_geo_dict = {x:SAT_patient_data[SAT_patient_data['Insulin_state']==x]['GEO_accession'] for x in ['resistant','sensitive']}
 
     gene_set = buildGeneSet(SAT_methylation_data)
-    results_df = pd.DataFrame(columns=['GEO_accession','probe_name','p_value'])
+    results_df = pd.DataFrame(columns=['UCSC_RefGene_Accession','probe_name','p_value'])
 
     for gene in gene_set:
         matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
@@ -86,8 +87,16 @@ def main():
         df = rebuildDataFrame(matrix,SAT_geo_accession,probes)
         df = ttestDataframe(df,insulin_geo_dict)
         gene_result_df = df[['probe_name','p_value']]
-        gene_result_df['GEO_accession']=gene
+        gene_result_df['UCSC_RefGene_Accession']=gene
         results_df.append(gene_results_df)
+
+    # Formatting as list of tuples to pass to qvalues function
+    ptuples = [(x[0],(x[1],x[2]) for x in results_df[['p_values','UCSC_RefGene_Accession','probe_name']].values]
+    qtuple = qvalues(ptuples)
+    new_results_df = pd.DataFrame([(q,p,ident[0],ident[1]) for q,p,ident in qtuple], columns=['q_value','p_value','UCSC_RefGene_Accession','probe_name'])
+
+
+
 
 
 
