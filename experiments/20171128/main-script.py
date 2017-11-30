@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import TruncatedSVD
@@ -53,8 +54,7 @@ def buildMatrix(clean_methylation_data, SAT_geo_accessions, gene_accession):
 def rebuildDataFrame(matrix, SAT_geo_accessions,probes):
     '''Rebuilds a dataframe from a matrix.'''
     df = pd.DataFrame(matrix,columns=SAT_geo_accessions)
-    probedf = pd.DataFrame(probes,columns=['probe_name'])
-    df=df.join(probedf)
+    df['probe_name'] = probes.values
     return df
 
 def ttestDataframe(dataframe, insulin_geo_dict):
@@ -97,7 +97,7 @@ def main():
         df = ttestDataframe(df,insulin_geo_dict)
         gene_result_df = df[['probe_name','p_value']]
         gene_result_df['UCSC_RefGene_Accession']=gene
-        results_df.append(gene_result_df)
+        results_df = results_df.append(gene_result_df)
 
     # Formatting as list of tuples to pass to qvalues function
     ptuples = [(x[0],(x[1],x[2])) for x in results_df[['p_value','UCSC_RefGene_Accession','probe_name']].values]
@@ -106,7 +106,7 @@ def main():
 
     #Displaying the results
     #Consider having other options for saving them
-    print(new_results_df)
+    new_results_df.to_csv(sys.stdout,sep='\t')
 
 
 

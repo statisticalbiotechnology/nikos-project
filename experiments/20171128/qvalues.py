@@ -1,7 +1,7 @@
 import numpy as np
 
 def bootstrap(invec):
-    idx = npr.randint(0, len(invec), len(invec))
+    idx = np.random.randint(0, len(invec), len(invec))
     return [invec[i] for i in idx]
 
 def estimatePi0(p, numBoot=100, numLambda=100, maxLambda=0.95):
