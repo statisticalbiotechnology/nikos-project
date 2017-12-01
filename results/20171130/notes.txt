@@ -1,0 +1,1 @@
+Results.txt contains output from version 0.1 of the software. The software runs but has not been properly validated. All calculations are done on beta-values, i.e. they have not been transformed into M-values prior to analysis.
