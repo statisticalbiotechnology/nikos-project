@@ -90,7 +90,9 @@ def main():
     gene_set = buildGeneSet(SAT_methylation_data)
     results_df = pd.DataFrame(columns=['UCSC_RefGene_Accession','probe_name','p_value'])
 
-    for gene in gene_set:
+    num_genes = len(gene_set)
+    for igene, gene in enumerate(gene_set):
+        print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
         matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
         matrix = denoiseMatrixWithSVD(matrix)
         df = rebuildDataFrame(matrix,SAT_geo_accession,probes)
