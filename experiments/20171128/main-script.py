@@ -6,6 +6,7 @@ from scipy.stats import ttest_ind
 from numpy.linalg import svd
 from qvalues import qvalues
 METHYLATION_FILE = '../../data/GSE76399_data_with_probe_ann.txt'
+METHYLATION_FILE = '../../data/NM_178822_data.txt'
 METHYLATION_FILE = '../../data/test_data.txt'
 PATIENT_FILE = '../../data/samples_clinical_data.txt'
 
@@ -26,9 +27,9 @@ def cleanData(methylation_data,patient_data):
     SAT_methylation_data = methylation_data.drop(no_SAT_patient_data['GEO_accession'],axis=1)
 
     # Removing probes without genes
-    gene_SAT_methylation_data = SAT_methylation_data[SAT_methylation_data['UCSC_RefGene_Accession'].notnull()]
+    gene_SAT_methylation_data = SAT_methylation_data.drop(SAT_methylation_data[SAT_methylation_data['UCSC_RefGene_Accession'].isnull()].index)
     # Converting genes to a set instead of semi-colon separated strings
-    gene_SAT_methylation_data['UCSC_RefGene_Accession'] = gene_SAT_methylation_data['UCSC_RefGene_Accession'].str.split(';').apply(set)
+    gene_SAT_methylation_data.loc[:,'UCSC_RefGene_Accession'] = gene_SAT_methylation_data['UCSC_RefGene_Accession'].str.split(';').apply(set)
     return gene_SAT_methylation_data, SAT_patient_data
 
 def buildGeneSet(clean_methylation_data):
@@ -63,7 +64,7 @@ def ttestDataframe(dataframe, insulin_geo_dict):
     group_dict = {x:dataframe[insulin_geo_dict[x]] for x in ['resistant','sensitive']}
 
     # Runs ttest
-    test_res = ttest_ind(group_dict['resistant'].values,group_dict['sensitive'],axis=1)
+    test_res = ttest_ind(group_dict['resistant'].values,group_dict['sensitive'].values,axis=1)
 
     # Save and return results
     ttestframe = pd.DataFrame(test_res[1],columns=['p_value'])
@@ -77,6 +78,11 @@ def denoiseMatrixWithSVD(matrix):
     rank1matrix = u1 @ v1 * s[0]
     return rank1matrix
 
+def betaToM(beta):
+    return np.log2(beta/(1-beta))
+
+def MToBeta(M):
+    return 2**M/(2**M + 1)
 
 def main():
     # Reading data from file
@@ -97,7 +103,7 @@ def main():
         matrix = denoiseMatrixWithSVD(matrix)
         df = rebuildDataFrame(matrix,SAT_geo_accession,probes)
         df = ttestDataframe(df,insulin_geo_dict)
-        gene_result_df = df[['probe_name','p_value']]
+        gene_result_df = df.loc[:,['probe_name','p_value']]
         gene_result_df['UCSC_RefGene_Accession']=gene
         results_df = results_df.append(gene_result_df)
 
@@ -108,7 +114,7 @@ def main():
 
     #Displaying the results
     #Consider having other options for saving them
-    new_results_df.to_csv(sys.stdout,sep='\t')
+    new_results_df.to_csv(sys.stdout,sep='\t',index=False)
 
 
 
