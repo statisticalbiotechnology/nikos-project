@@ -6,8 +6,8 @@ from scipy.stats import ttest_ind
 from numpy.linalg import svd
 from qvalues import qvalues
 METHYLATION_FILE = '../../data/GSE76399_data_with_probe_ann.txt'
-METHYLATION_FILE = '../../data/NM_178822_data.txt'
-METHYLATION_FILE = '../../data/test_data.txt'
+#METHYLATION_FILE = '../../data/NM_178822_data.txt'
+#METHYLATION_FILE = '../../data/test_data.txt'
 PATIENT_FILE = '../../data/samples_clinical_data.txt'
 
 def csvToDataFrame(filename):
@@ -72,6 +72,7 @@ def ttestDataframe(dataframe, insulin_geo_dict):
     return dataframe
 
 def denoiseMatrixWithSVD(matrix):
+    '''Run SVD and build matrix for first singular value.'''
     u,s,v = svd(matrix)
     u1 = u[:,0].reshape(-1,1)
     v1 = v[0,:].reshape(1,-1)
@@ -79,20 +80,25 @@ def denoiseMatrixWithSVD(matrix):
     return rank1matrix
 
 def betaToM(beta):
+    '''Converts a beta-value to a M-value.'''
     return np.log2(beta/(1-beta))
 
 def MToBeta(M):
+    '''Converts a M-value to a beta-value.'''
     return 2**M/(2**M + 1)
 
 def columnsFromBetaToM(df, SAT_geo_accession):
+    '''Turns the columns containing beta values into columns containing M-values.'''
     df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].applymap(betaToM)
     return df
 
 def normalizeBeta(beta):
+    '''Ensures that beta is in the range (0,1).'''
     e = 1e-9
     return np.minimum(np.maximum(beta,e),1-e)
 
 def normalizeBetaColumns(df, SAT_geo_accession):
+    '''Ensures that all beta-values are in range (0,1).'''
     df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].applymap(normalizeBeta)
     return df
 
