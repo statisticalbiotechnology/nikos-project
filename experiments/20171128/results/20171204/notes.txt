@@ -1,1 +1,3 @@
 res20171204_1.txt contains results from first run on entire data set based on M-values. Code has not been unittested prior to performing this run.
+
+res20171204_2.txt contains results from second run on entire data set based on M-values. Code has not been unittested prior to performing this run. Doing dimensionality reduction instead of denoising for the first time.
