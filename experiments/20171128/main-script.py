@@ -4,10 +4,11 @@ import pandas as pd
 from sklearn.decomposition import TruncatedSVD
 from scipy.stats import ttest_ind
 from numpy.linalg import svd
+#np.seterr(all='raise')
 from qvalues import qvalues
 METHYLATION_FILE = '../../data/GSE76399_data_with_probe_ann.txt'
 #METHYLATION_FILE = '../../data/NM_178822_data.txt'
-#METHYLATION_FILE = '../../data/test_data.txt'
+METHYLATION_FILE = '../../data/test_data.txt'
 PATIENT_FILE = '../../data/samples_clinical_data.txt'
 
 def csvToDataFrame(filename):
@@ -102,6 +103,15 @@ def normalizeBetaColumns(df, SAT_geo_accession):
     df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].applymap(normalizeBeta)
     return df
 
+def calcEigenSample(matrix):
+    svd = TruncatedSVD(1)
+    svd.fit(matrix)
+    return svd.components_
+
+def dfFromEigenSample(matrix,SAT_geo_accession):
+    df = pd.DataFrame(matrix,columns=SAT_geo_accession)
+    return df
+
 
 
 def main():
@@ -123,22 +133,22 @@ def main():
     gene_set = buildGeneSet(SAT_methylation_data)
     num_genes = len(gene_set)
 
-    results_df = pd.DataFrame(columns=['UCSC_RefGene_Accession','probe_name','p_value'])
+    results_df = pd.DataFrame(columns=['UCSC_RefGene_Accession','p_value'])
 
     for igene, gene in enumerate(gene_set):
         print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
         matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
-        matrix = denoiseMatrixWithSVD(matrix)
-        df = rebuildDataFrame(matrix,SAT_geo_accession,probes)
+        eigensample = calcEigenSample(matrix)
+        df = dfFromEigenSample(eigensample,SAT_geo_accession)
         df = ttestDataframe(df,insulin_geo_dict)
-        gene_result_df = df.loc[:,['probe_name','p_value']]
-        gene_result_df['UCSC_RefGene_Accession']=gene
+        df['UCSC_RefGene_Accession'] = gene
+        gene_result_df = df.loc[:,['p_value','UCSC_RefGene_Accession']]
         results_df = results_df.append(gene_result_df)
 
     # Formatting as list of tuples to pass to qvalues function
-    ptuples = [(x[0],(x[1],x[2])) for x in results_df[['p_value','UCSC_RefGene_Accession','probe_name']].values]
+    ptuples = [(x[0],x[1]) for x in results_df[['p_value','UCSC_RefGene_Accession']].values]
     qtuple = qvalues(ptuples)
-    new_results_df = pd.DataFrame([(q,p,ident[0],ident[1]) for q,p,ident in qtuple], columns=['q_value','p_value','UCSC_RefGene_Accession','probe_name'])
+    new_results_df = pd.DataFrame([(q,p,ident) for q,p,ident in qtuple], columns=['q_value','p_value','UCSC_RefGene_Accession'])
 
     #Displaying the results
     #Consider having other options for saving them
