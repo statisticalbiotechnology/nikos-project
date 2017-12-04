@@ -84,19 +84,41 @@ def betaToM(beta):
 def MToBeta(M):
     return 2**M/(2**M + 1)
 
+def columnsFromBetaToM(df, SAT_geo_accession):
+    df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].applymap(betaToM)
+    return df
+
+def normalizeBeta(beta):
+    e = 1e-9
+    return np.minimum(np.maximum(beta,e),1-e)
+
+def normalizeBetaColumns(df, SAT_geo_accession):
+    df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].applymap(normalizeBeta)
+    return df
+
+
+
 def main():
     # Reading data from file
     methylation_data = csvToDataFrame(METHYLATION_FILE)
     patient_data = csvToDataFrame(PATIENT_FILE)
 
     SAT_methylation_data, SAT_patient_data = cleanData(methylation_data, patient_data)
+
+    # Picks out SAT samples (columns)
     SAT_geo_accession = SAT_patient_data['GEO_accession']
     insulin_geo_dict = {x:SAT_patient_data[SAT_patient_data['Insulin_state']==x]['GEO_accession'] for x in ['resistant','sensitive']}
 
+    # Make sure that beta values are in range (0,1)
+    SAT_methylation_data = normalizeBetaColumns(SAT_methylation_data,SAT_geo_accession)
+    # Convert beta values to M values
+    SAT_methylation_data = columnsFromBetaToM(SAT_methylation_data,SAT_geo_accession)
+
     gene_set = buildGeneSet(SAT_methylation_data)
+    num_genes = len(gene_set)
+
     results_df = pd.DataFrame(columns=['UCSC_RefGene_Accession','probe_name','p_value'])
 
-    num_genes = len(gene_set)
     for igene, gene in enumerate(gene_set):
         print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
         matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
