@@ -4,8 +4,11 @@ import pandas as pd
 from sklearn.decomposition import TruncatedSVD
 from scipy.stats import ttest_ind
 from numpy.linalg import svd
+import matplotlib.pyplot as plt
+import seaborn as sns
 #np.seterr(all='raise')
 from qvalues import qvalues
+CHECK_FOR_OUTLIERS = True
 METHYLATION_FILE = '../../data/GSE76399_data_with_probe_ann.txt'
 #METHYLATION_FILE = '../../data/NM_178822_data.txt'
 METHYLATION_FILE = '../../data/test_data.txt'
@@ -104,13 +107,25 @@ def normalizeBetaColumns(df, SAT_geo_accession):
     return df
 
 def calcEigenSample(matrix):
+    '''Calculate the first eigensample of the probe-sample matrix.'''
     svd = TruncatedSVD(1)
     svd.fit(matrix)
     return svd.components_
 
 def dfFromEigenSample(matrix,SAT_geo_accession):
+    '''Build dataframe from the eigensample.'''
     df = pd.DataFrame(matrix,columns=SAT_geo_accession)
     return df
+
+def checkForOutliers(df,SAT_geo_accession,insulin_geo_dict):
+    '''Print the sum of the eigensamples. Also display heatmap of the eigensamples.'''
+    df[insulin_geo_dict['resistant'].append(insulin_geo_dict['sensitive'])].sum().to_csv(sys.stdout,sep='\t')
+    ax=sns.heatmap(df.sort_values(by=['p_value'])[insulin_geo_dict['resistant'].append(insulin_geo_dict['sensitive'])],xticklabels=1,yticklabels=False)
+    for item in ax.get_xticklabels():
+        item.set_rotation(90)
+    plt.show()
+
+
 
 
 
@@ -142,17 +157,22 @@ def main():
         df = dfFromEigenSample(eigensample,SAT_geo_accession)
         df = ttestDataframe(df,insulin_geo_dict)
         df['UCSC_RefGene_Accession'] = gene
-        gene_result_df = df.loc[:,['p_value','UCSC_RefGene_Accession']]
-        results_df = results_df.append(gene_result_df)
+        #gene_result_df = df.loc[:,['p_value','UCSC_RefGene_Accession']]
+        #results_df = results_df.append(gene_result_df)
+        results_df = results_df.append(df)
 
-    # Formatting as list of tuples to pass to qvalues function
-    ptuples = [(x[0],x[1]) for x in results_df[['p_value','UCSC_RefGene_Accession']].values]
-    qtuple = qvalues(ptuples)
-    new_results_df = pd.DataFrame([(q,p,ident) for q,p,ident in qtuple], columns=['q_value','p_value','UCSC_RefGene_Accession'])
+    if CHECK_FOR_OUTLIERS:
+        # Checking for outliers
+        checkForOutliers(results_df,SAT_geo_accession,insulin_geo_dict)
+    else:
+        # Formatting as list of tuples to pass to qvalues function
+        ptuples = [(x[0],x[1]) for x in results_df[['p_value','UCSC_RefGene_Accession']].values]
+        qtuple = qvalues(ptuples)
+        new_results_df = pd.DataFrame([(q,p,ident) for q,p,ident in qtuple], columns=['q_value','p_value','UCSC_RefGene_Accession'])
 
-    #Displaying the results
-    #Consider having other options for saving them
-    new_results_df.to_csv(sys.stdout,sep='\t',index=False)
+        #Displaying the results
+        #Consider having other options for saving them
+        new_results_df.to_csv(sys.stdout,sep='\t',index=False)
 
 
 
