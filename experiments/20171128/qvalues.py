@@ -22,10 +22,11 @@ def estimatePi0(p, numBoot=100, numLambda=100, maxLambda=0.95):
     return pi0s[minIx]
 
 # The input to this function is tupples of p-values and analyte names, e.g. (p,coord)
-def qvalues(pvalues):
+def qvalues(pvalues,pi0=None):
     m=len(pvalues)
     pvalues.sort()
-    pi0 = estimatePi0([p for p,coord in pvalues])
+    if pi0 is None:
+        pi0 = estimatePi0([p for p,coord in pvalues])
     num_p, qs = 0.0, []
     for p,coord in pvalues:
         num_p += 1.0
