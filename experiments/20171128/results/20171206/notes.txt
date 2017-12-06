@@ -1,0 +1,6 @@
+res06122017.txt contains the sum of the eigensamples of a run based random uniformly distributed beta-values. 06-12-2017.(png|jpg) is a heatmap of the eigensamples for each gene. Its made with random uniformly distributed beta-values. 
+red06122017_2.txt contians p-values and q-values for each gene. Calculations are based on uniformly distributed beta-values. 
+
+The following code-change was used for res06122017.txt, red06122017_2.txt, and 06-12-2017.(png|jpg):
+def normalizeBeta(beta):
+    return np.random.uniform(0, 1)
