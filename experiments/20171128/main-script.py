@@ -1,17 +1,19 @@
 import sys
 import numpy as np
+#np.seterr(all='raise')
 import pandas as pd
 from sklearn.decomposition import TruncatedSVD
 from scipy.stats import ttest_ind
 from numpy.linalg import svd
 import matplotlib.pyplot as plt
 import seaborn as sns
-#np.seterr(all='raise')
 from qvalues import qvalues
-CHECK_FOR_OUTLIERS = True
+from multiprocessing import Pool
+
+CHECK_FOR_OUTLIERS = False
 METHYLATION_FILE = '../../data/GSE76399_data_with_probe_ann.txt'
 #METHYLATION_FILE = '../../data/NM_178822_data.txt'
-METHYLATION_FILE = '../../data/test_data.txt'
+#METHYLATION_FILE = '../../data/test_data.txt'
 PATIENT_FILE = '../../data/samples_clinical_data.txt'
 
 def csvToDataFrame(filename):
@@ -126,6 +128,19 @@ def checkForOutliers(df,SAT_geo_accession,insulin_geo_dict):
     plt.show()
 
 
+def normalizeColumns(df,SAT_geo_accession):
+    df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].subtract(df.loc[:,SAT_geo_accession].mean(axis=0))
+    df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].divide(df.loc[:,SAT_geo_accession].std(axis=0))
+    return df
+
+def calculationsPerGene(SAT_methylation_data,SAT_geo_accession,gene,igene,num_genes,insulin_geo_dict):
+        print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
+        matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
+        eigensample = calcEigenSample(matrix)
+        df = dfFromEigenSample(eigensample,SAT_geo_accession)
+        df = ttestDataframe(df,insulin_geo_dict)
+        df['UCSC_RefGene_Accession'] = gene
+        return df
 
 
 
@@ -144,9 +159,14 @@ def main():
     SAT_methylation_data = normalizeBetaColumns(SAT_methylation_data,SAT_geo_accession)
     # Convert beta values to M values
     SAT_methylation_data = columnsFromBetaToM(SAT_methylation_data,SAT_geo_accession)
+    # Normalize columns
+    SAT_methylation_data = normalizeColumns(SAT_methylation_data,SAT_geo_accession)
 
     gene_set = buildGeneSet(SAT_methylation_data)
     num_genes = len(gene_set)
+
+#    with Pool() as p:
+#        results_df = pd.concat(p.starmap(calculationsPerGene, [(SAT_methylation_data,SAT_geo_accession,gene,igene,num_genes,insulin_geo_dict) for igene, gene in enumerate(gene_set)]))
 
     results_df = pd.DataFrame(columns=['UCSC_RefGene_Accession','p_value'])
 
@@ -160,6 +180,7 @@ def main():
         #gene_result_df = df.loc[:,['p_value','UCSC_RefGene_Accession']]
         #results_df = results_df.append(gene_result_df)
         results_df = results_df.append(df)
+
 
     if CHECK_FOR_OUTLIERS:
         # Checking for outliers
