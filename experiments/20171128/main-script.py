@@ -9,11 +9,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from qvalues import qvalues
 from multiprocessing import Pool
+from wpca import WPCA
 
 CHECK_FOR_OUTLIERS = False
 METHYLATION_FILE = '../../data/GSE76399_data_with_probe_ann.txt'
 #METHYLATION_FILE = '../../data/NM_178822_data.txt'
-#METHYLATION_FILE = '../../data/test_data.txt'
+METHYLATION_FILE = '../../data/test_data.txt'
+METHYLATION_FILE = '../../data/test_30k.txt'
 PATIENT_FILE = '../../data/samples_clinical_data.txt'
 
 def csvToDataFrame(filename):
@@ -51,6 +53,8 @@ def buildMatrix(clean_methylation_data, SAT_geo_accessions, gene_accession):
     # Picking rows
     rows = clean_methylation_data['UCSC_RefGene_Accession'].map(lambda probe_gene_set: gene_accession in probe_gene_set)
     df = clean_methylation_data[rows]
+    if df.shape[0] == 1:
+        return None,None
     probes = df['Name']
     # Picking columns
     df = df[SAT_geo_accessions]
@@ -129,18 +133,45 @@ def checkForOutliers(df,SAT_geo_accession,insulin_geo_dict):
 
 
 def normalizeColumns(df,SAT_geo_accession):
+    '''Subtract mean and divide by std dev for all columns.'''
     df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].subtract(df.loc[:,SAT_geo_accession].mean(axis=0))
     df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].divide(df.loc[:,SAT_geo_accession].std(axis=0))
     return df
 
-def calculationsPerGene(SAT_methylation_data,SAT_geo_accession,gene,igene,num_genes,insulin_geo_dict):
-        print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
-        matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
-        eigensample = calcEigenSample(matrix)
-        df = dfFromEigenSample(eigensample,SAT_geo_accession)
-        df = ttestDataframe(df,insulin_geo_dict)
-        df['UCSC_RefGene_Accession'] = gene
-        return df
+#def calculationsPerGene(SAT_methylation_data,SAT_geo_accession,gene,igene,num_genes,insulin_geo_dict):
+#        print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
+#        matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
+#        eigensample = calcEigenSample(matrix)
+#        df = dfFromEigenSample(eigensample,SAT_geo_accession)
+#        df = ttestDataframe(df,insulin_geo_dict)
+#        df['UCSC_RefGene_Accession'] = gene
+#        return df
+
+def replaceMissingDataPoint(beta, eps = 1e-1):
+    '''Replace 'bad' values with NaN.'''
+    if (beta < eps) or (beta > (1 - eps)):
+        return np.nan
+    return beta
+
+def handleMissingData(df,SAT_geo_accession):
+    '''Replace 'bad' values with NaN in all columns.'''
+    df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].applymap(replaceMissingDataPoint)
+    return df
+
+def eigensampleFromWPCA(matrix):
+    '''Find a representation of each sample using wPCA to exclude NaNs.'''
+    weights = 1.0 - np.isnan(matrix.T)
+    pc = WPCA(n_components=1).fit_reconstruct(matrix.T,weights=weights)
+    return pc.T
+
+
+def dropBadRows(df,SAT_geo_accession,eps=0.1):
+    '''Drop all rows that contain values outside of (eps,1-eps) range.'''
+    idxs = df[((df.loc[:,SAT_geo_accession] < eps) | (df.loc[:,SAT_geo_accession] >(1- eps))).any(1)].index
+    df = df.drop(idxs)
+    return df
+
+    
 
 
 
@@ -155,12 +186,18 @@ def main():
     SAT_geo_accession = SAT_patient_data['GEO_accession']
     insulin_geo_dict = {x:SAT_patient_data[SAT_patient_data['Insulin_state']==x]['GEO_accession'] for x in ['resistant','sensitive']}
 
-    # Make sure that beta values are in range (0,1)
-    SAT_methylation_data = normalizeBetaColumns(SAT_methylation_data,SAT_geo_accession)
+    ## Make sure that beta values are in range (0,1)
+    #SAT_methylation_data = normalizeBetaColumns(SAT_methylation_data,SAT_geo_accession)
+    # Remove values smaller than eps (default = 0.1)
+    #print(SAT_methylation_data[SAT_geo_accession])
+    #SAT_methylation_data = handleMissingData(SAT_methylation_data,SAT_geo_accession)
+    #print(SAT_methylation_data[SAT_geo_accession])
+    # Drop all rows with elements smaller than eps or larger than 1 - eps
+    SAT_methylation_data = dropBadRows(SAT_methylation_data,SAT_geo_accession)
     # Convert beta values to M values
     SAT_methylation_data = columnsFromBetaToM(SAT_methylation_data,SAT_geo_accession)
     # Normalize columns
-    SAT_methylation_data = normalizeColumns(SAT_methylation_data,SAT_geo_accession)
+    #SAT_methylation_data = normalizeColumns(SAT_methylation_data,SAT_geo_accession)
 
     gene_set = buildGeneSet(SAT_methylation_data)
     num_genes = len(gene_set)
@@ -173,7 +210,11 @@ def main():
     for igene, gene in enumerate(gene_set):
         print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
         matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
+        if matrix is None:
+            print('Too few probes found for gene {0}'.format(gene),file=sys.stderr)
+            continue
         eigensample = calcEigenSample(matrix)
+#        eigensample = eigensampleFromWPCA(matrix)
         df = dfFromEigenSample(eigensample,SAT_geo_accession)
         df = ttestDataframe(df,insulin_geo_dict)
         df['UCSC_RefGene_Accession'] = gene
