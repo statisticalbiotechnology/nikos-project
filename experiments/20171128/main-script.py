@@ -11,7 +11,7 @@ from qvalues import qvalues
 from multiprocessing import Pool
 from wpca import WPCA
 
-CHECK_FOR_OUTLIERS = False
+#CHECK_FOR_OUTLIERS = False
 METHYLATION_FILE = '../../data/GSE76399_data_with_probe_ann.txt'
 #METHYLATION_FILE = '../../data/NM_178822_data.txt'
 METHYLATION_FILE = '../../data/test_data.txt'
@@ -126,11 +126,13 @@ def dfFromEigenSample(matrix,SAT_geo_accession):
 def checkForOutliers(df,SAT_geo_accession,insulin_geo_dict):
     '''Print the sum of the eigensamples. Also display heatmap of the eigensamples.'''
     df[insulin_geo_dict['resistant'].append(insulin_geo_dict['sensitive'])].sum().to_csv(sys.stdout,sep='\t')
+    showOutliers(df,SAT_geo_accession,insulin_geo_dict)
+
+def showOutliers(df,SAT_geo_accession,insulin_geo_dict):
     ax=sns.heatmap(df.sort_values(by=['p_value'])[insulin_geo_dict['resistant'].append(insulin_geo_dict['sensitive'])],xticklabels=1,yticklabels=False)
     for item in ax.get_xticklabels():
         item.set_rotation(90)
     plt.show()
-
 
 def normalizeColumns(df,SAT_geo_accession):
     '''Subtract mean and divide by std dev for all columns.'''
@@ -191,11 +193,11 @@ def main():
     results_df = pd.DataFrame(columns=['UCSC_RefGene_Accession','p_value'])
 
     for igene, gene in enumerate(gene_set):
-        print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
         matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
         if matrix is None:
-            print('Too few probes found for gene {0}'.format(gene),file=sys.stderr)
+            print('Too few probes found for gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
             continue
+        print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
         eigensample = calcEigenSample(matrix)
 #        eigensample = eigensampleFromWPCA(matrix)
         df = dfFromEigenSample(eigensample,SAT_geo_accession)
@@ -204,18 +206,19 @@ def main():
         results_df = results_df.append(df)
 
 
-    if CHECK_FOR_OUTLIERS:
-        # Checking for outliers
-        checkForOutliers(results_df,SAT_geo_accession,insulin_geo_dict)
-    else:
-        # Formatting as list of tuples to pass to qvalues function
-        ptuples = [(x[0],x[1]) for x in results_df[['p_value','UCSC_RefGene_Accession']].values]
-        qtuple = qvalues(ptuples)
-        new_results_df = pd.DataFrame([(q,p,ident) for q,p,ident in qtuple], columns=['q_value','p_value','UCSC_RefGene_Accession'])
+    #if CHECK_FOR_OUTLIERS:
+    #    # Checking for outliers
+    #    checkForOutliers(results_df,SAT_geo_accession,insulin_geo_dict)
+    #else:
+    # Formatting as list of tuples to pass to qvalues function
+    ptuples = [(x[0],x[1]) for x in results_df[['p_value','UCSC_RefGene_Accession']].values]
+    qtuple = qvalues(ptuples)
+    new_results_df = pd.DataFrame([(q,p,ident) for q,p,ident in qtuple], columns=['q_value','p_value','UCSC_RefGene_Accession'])
 
-        #Displaying the results
-        #Consider having other options for saving them
-        new_results_df.to_csv(sys.stdout,sep='\t',index=False)
+    #Displaying the results
+    #Consider having other options for saving them
+    new_results_df.to_csv(sys.stdout,sep='\t',index=False)
+    showOutliers(results_df,SAT_geo_accession,insulin_geo_dict)
 
 
 
