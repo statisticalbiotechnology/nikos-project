@@ -138,15 +138,6 @@ def normalizeColumns(df,SAT_geo_accession):
     df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].divide(df.loc[:,SAT_geo_accession].std(axis=0))
     return df
 
-#def calculationsPerGene(SAT_methylation_data,SAT_geo_accession,gene,igene,num_genes,insulin_geo_dict):
-#        print('Working on gene {0} ({1}/{2})'.format(gene,igene+1,num_genes),file=sys.stderr)
-#        matrix,probes = buildMatrix(SAT_methylation_data,SAT_geo_accession,gene)
-#        eigensample = calcEigenSample(matrix)
-#        df = dfFromEigenSample(eigensample,SAT_geo_accession)
-#        df = ttestDataframe(df,insulin_geo_dict)
-#        df['UCSC_RefGene_Accession'] = gene
-#        return df
-
 def replaceMissingDataPoint(beta, eps = 1e-1):
     '''Replace 'bad' values with NaN.'''
     if (beta < eps) or (beta > (1 - eps)):
@@ -186,12 +177,6 @@ def main():
     SAT_geo_accession = SAT_patient_data['GEO_accession']
     insulin_geo_dict = {x:SAT_patient_data[SAT_patient_data['Insulin_state']==x]['GEO_accession'] for x in ['resistant','sensitive']}
 
-    ## Make sure that beta values are in range (0,1)
-    #SAT_methylation_data = normalizeBetaColumns(SAT_methylation_data,SAT_geo_accession)
-    # Remove values smaller than eps (default = 0.1)
-    #print(SAT_methylation_data[SAT_geo_accession])
-    #SAT_methylation_data = handleMissingData(SAT_methylation_data,SAT_geo_accession)
-    #print(SAT_methylation_data[SAT_geo_accession])
     # Drop all rows with elements smaller than eps or larger than 1 - eps
     SAT_methylation_data = dropBadRows(SAT_methylation_data,SAT_geo_accession)
     # Convert beta values to M values
@@ -202,8 +187,6 @@ def main():
     gene_set = buildGeneSet(SAT_methylation_data)
     num_genes = len(gene_set)
 
-#    with Pool() as p:
-#        results_df = pd.concat(p.starmap(calculationsPerGene, [(SAT_methylation_data,SAT_geo_accession,gene,igene,num_genes,insulin_geo_dict) for igene, gene in enumerate(gene_set)]))
 
     results_df = pd.DataFrame(columns=['UCSC_RefGene_Accession','p_value'])
 
@@ -218,8 +201,6 @@ def main():
         df = dfFromEigenSample(eigensample,SAT_geo_accession)
         df = ttestDataframe(df,insulin_geo_dict)
         df['UCSC_RefGene_Accession'] = gene
-        #gene_result_df = df.loc[:,['p_value','UCSC_RefGene_Accession']]
-        #results_df = results_df.append(gene_result_df)
         results_df = results_df.append(df)
 
 
