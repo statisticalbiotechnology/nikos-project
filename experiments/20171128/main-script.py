@@ -198,6 +198,7 @@ def main():
     #SAT_methylation_data = normalizeColumns(SAT_methylation_data,SAT_geo_accession)
 
     gene_set = buildGeneSet(SAT_methylation_data)
+    gene_set = {'NM_018284'}
     num_genes = len(gene_set)
 
 
@@ -212,6 +213,8 @@ def main():
         eigensample = calcEigenSample(matrix)
 #        eigensample = eigensampleFromWPCA(matrix)
         df = dfFromEigenSample(eigensample,SAT_geo_accession)
+        df.to_csv(sys.stdout,sep='\t',index=False)
+        return 0
         df = ttestDataframe(df,insulin_geo_dict)
         df['UCSC_RefGene_Accession'] = gene
         results_df = results_df.append(df)
