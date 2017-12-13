@@ -14,8 +14,8 @@ from wpca import WPCA
 #CHECK_FOR_OUTLIERS = False
 METHYLATION_FILE = '../../data/GSE76399_data_with_probe_ann.txt'
 #METHYLATION_FILE = '../../data/NM_178822_data.txt'
-METHYLATION_FILE = '../../data/test_data.txt'
-METHYLATION_FILE = '../../data/test_30k.txt'
+#METHYLATION_FILE = '../../data/test_data.txt'
+#METHYLATION_FILE = '../../data/test_30k.txt'
 PATIENT_FILE = '../../data/samples_clinical_data.txt'
 
 def csvToDataFrame(filename):
@@ -134,15 +134,22 @@ def showOutliers(df,SAT_geo_accession,insulin_geo_dict):
         item.set_rotation(90)
     plt.show()
 
+def showInputData(df,SAT_geo_accession,insulin_geo_dict):
+    data = df[insulin_geo_dict['resistant'].append(insulin_geo_dict['sensitive'])]
+    ax=sns.heatmap(data.sort_values(by=['GSM1986071']),xticklabels=1,yticklabels=False)
+    for item in ax.get_xticklabels():
+        item.set_rotation(90)
+    plt.show()
+
 def normalizeColumns(df,SAT_geo_accession):
     '''Subtract mean and divide by std dev for all columns.'''
     df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].subtract(df.loc[:,SAT_geo_accession].mean(axis=0))
     df.loc[:,SAT_geo_accession] = df.loc[:,SAT_geo_accession].divide(df.loc[:,SAT_geo_accession].std(axis=0))
     return df
 
-def replaceMissingDataPoint(beta, eps = 1e-1):
+def replaceMissingDataPoint(beta, eps = 0):
     '''Replace 'bad' values with NaN.'''
-    if (beta < eps) or (beta > (1 - eps)):
+    if (beta <= eps) or (beta >= (1 - eps)):
         return np.nan
     return beta
 
@@ -158,7 +165,7 @@ def eigensampleFromWPCA(matrix):
     return pc.T
 
 
-def dropBadRows(df,SAT_geo_accession,eps=0.1):
+def dropBadRows(df,SAT_geo_accession,eps=0.05):
     '''Drop all rows that contain values outside of (eps,1-eps) range.'''
     idxs = df[((df.loc[:,SAT_geo_accession] < eps) | (df.loc[:,SAT_geo_accession] >(1- eps))).any(1)].index
     df = df.drop(idxs)
@@ -179,6 +186,10 @@ def main():
     SAT_geo_accession = SAT_patient_data['GEO_accession']
     insulin_geo_dict = {x:SAT_patient_data[SAT_patient_data['Insulin_state']==x]['GEO_accession'] for x in ['resistant','sensitive']}
 
+    ## Replace all elements smaller than eps or larger than 1 - eps with np.nan
+    #SAT_methylation_data = handleMissingData(SAT_methylation_data,SAT_geo_accession)
+    ## Plot input data
+    #showInputData(SAT_methylation_data,SAT_geo_accession,insulin_geo_dict)
     # Drop all rows with elements smaller than eps or larger than 1 - eps
     SAT_methylation_data = dropBadRows(SAT_methylation_data,SAT_geo_accession)
     # Convert beta values to M values
